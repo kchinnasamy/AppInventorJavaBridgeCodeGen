@@ -93,6 +93,17 @@ Blockly.Yail.INTEGER_REGEXP = "^[\\s]*[-+]?[0-9]+[\\s]*$";
 Blockly.Yail.FLONUM_REGEXP = "^[\\s]*[-+]?([0-9]*)((\\.[0-9]+)|[0-9]\\.)[\\s]*$";
 
 
+Blockly.Yail.JBRIDGE_BASE_IMPORTS = " import com.google.appinventor.components.runtime.HandlesEventDispatching; \nimport com.google.appinventor.components.runtime.EventDispatcher; \nimport com.google.appinventor.components.runtime.Form; \nimport com.google.appinventor.components.runtime.Component; \n";
+Blockly.Yail.JBRIDGE_PACKAGE_NAME = "\n package org.appinventor.ai_test.Test.Screen1; \n";
+
+// Blockly.Yail.JBRIDGE_DECLARE = [];
+// Blockly.Yail.JBRIDGE_DEFINE = [];
+// Blockly.Yail.JBRIDGE_IMPORTS = [];
+var jBridgeRegisterEventMap = new Object();
+var jBridgeEventsList = [];
+
+
+
 /**
  * Generate the Yail code for this blocks workspace, given its associated form specification.
  * 
@@ -118,7 +129,15 @@ Blockly.Yail.getFormYail = function(formJson, packageName, forRepl) {
   if (!formName) {
     throw "Unable to determine form name";
   }
+  
+  code.push("\n######################################\n");
+  var my_all_blocks = Blockly.mainWorkspace.getAllBlocks();
+  code.push(my_all_blocks);
+  code.push("\n######################################\n");
 
+  code.push("\n------------------------------------\n");
+  code.push(Blockly.Yail.genJBridgeCode(Blockly.mainWorkspace.getTopBlocks(true)));
+  code.push("\n------------------------------------\n");
   if (!forRepl) {
     code.push(Blockly.Yail.getYailPrelude(packageName, formName));
   }
@@ -614,3 +633,103 @@ Blockly.Yail.blockToCode1 = function(block) {
 };
 
 
+Blockly.Yail.genJBridgeCode = function(topBlocks){
+  var code = Blockly.Yail.JBRIDGE_PACKAGE_NAME + 
+  Blockly.Yail.JBRIDGE_BASE_IMPORTS +
+  
+  Blockly.Yail.genJBridgeClass(topBlocks);
+
+  return code;  
+};
+
+Blockly.Yail.genJBridgeClass =  function (topBlocks){
+  Blockly.Yail.parseTopBlocks(topBlocks);
+  var code = "\npublic class Screen1 extends Form implements HandlesEventDispatching { \n"
+    + Blockly.Yail.genJBridgeDefineMethod()
+    +Blockly.Yail.genJBridgeDispatchEvent(); 
+    +"\n}\n"  
+  return code;
+};
+
+Blockly.Yail.genJBridgeEventsRegister = function(jBridgeEventsList){
+  var registeredEvents = []
+  for(var key in jBridgeEventsList){
+      registeredEvents.push(jBridgeEventsList[key]);
+  }
+  return registeredEvents.join("\n");
+};
+
+Blockly.Yail.genJBridgeDefineMethod =  function (jBridgeEventsList){
+ var code =  "\nprotected void $define() { \n"
+  + "// TODO Implement Definetion and Declaration \n"
+  + Blockly.Yail.genJBridgeEventsRegister(jBridgeEventsList)
+  +"\n}";
+    return code;
+};
+
+Blockly.Yail.genJBridgeDispatchEvent = function(){
+  var code = "\npublic boolean dispatchEvent(Component component, String componentName, String eventName, Object[] params){\n"
+  + jBridgeEventsList.join("\n")
+  +"\n return false;"
+  +"\n}";
+
+  return code;
+};
+
+Blockly.Yail.parseTopBlocks = function (topBlocks){
+    for (var x = 0, block; block = topBlocks[x]; x++) {
+      var blockType = block.category;
+      if (blockType == "Component"){
+        Blockly.Yail.parseJBridgeComponentBlock(block);
+      }
+    }
+};
+
+Blockly.Yail.parseJBridgeComponentBlock = function(componentBlock){
+  var eventType = componentBlock.blockType;
+  if (eventType == "event"){
+      Blockly.Yail.paseJBridgeEventBlock(componentBlock)
+  }else{
+    document.write( "Invalid Block type : " + eventType );
+  }
+};
+
+Blockly.Yail.paseJBridgeEventBlock = function(eventBlock){
+  var eventName = eventBlock.eventName;
+  var componentName = eventBlock.instanceName;
+
+  if (eventName == "Click"){
+    Blockly.Yail.buildJBridgeClickEventBlock(eventBlock);
+  }
+  else{
+    jBridgeEventsList.push("Invalid Event type :" + eventName);
+  }
+
+  //Add to RegisterEventsMap
+  jBridgeRegisterEventMap[eventName] = Blockly.Yail.genJBridgeEventDispatcher(eventName); 
+
+};
+
+
+Blockly.Yail.buildJBridgeClickEventBlock = function(clickEventBlock){
+
+  var componentName = clickEventBlock.instanceName;
+  var eventName = clickEventBlock.eventName;
+  var body = "//TODO Genrate Event(When) Block Body";
+
+  jBridgeEventsList.push(Blockly.Yail.genJBridgeEventBlock(componentName, eventName, body));  
+};
+
+//Event Blocks are actualy the "When Blocks"
+Blockly.Yail.genJBridgeEventBlock = function(componentName, eventName, body){
+  var code = "\nif( component.equals("+componentName+") && eventName.equals(\""+eventName+"\") ){\n"
+    + body + "\n"
+    +"return true;\n"
+    +"}";
+
+  return code;
+}; 
+
+Blockly.Yail.genJBridgeEventDispatcher = function(eventName){
+  return "EventDispatcher.registerEventForDelegation( this, " + eventName +"Event, "+ eventName +" );";
+}
