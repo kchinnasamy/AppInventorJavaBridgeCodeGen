@@ -678,19 +678,26 @@ Blockly.Yail.genJBridgeDispatchEvent = function(){
 
 Blockly.Yail.parseTopBlocks = function (topBlocks){
     for (var x = 0, block; block = topBlocks[x]; x++) {
-      var blockType = block.category;
-      if (blockType == "Component"){
+      var blockCategory = block.category;
+      if (blockCategory == "Component"){
         Blockly.Yail.parseJBridgeComponentBlock(block);
       }
     }
 };
 
 Blockly.Yail.parseJBridgeComponentBlock = function(componentBlock){
-  var eventType = componentBlock.blockType;
-  if (eventType == "event"){
+  var componentType = componentBlock.type;
+  if (componentType == "component_event"){
+      Blockly.Yail.paseJBridgeEventBlock(componentBlock)
+  }else if (componentType == "component_set_get"){
+      if (componentBlock.setOrGet == "set"){
+
+      }else{
+        
+      }
       Blockly.Yail.paseJBridgeEventBlock(componentBlock)
   }else{
-    document.write( "Invalid Block type : " + eventType );
+    document.write( "Invalid Block type : " + componentType );
   }
 };
 
