@@ -99,6 +99,7 @@ Blockly.Yail.JBRIDGE_PACKAGE_NAME = "\n package org.appinventor.ai_test.Test.Scr
 // Blockly.Yail.JBRIDGE_DECLARE = [];
 // Blockly.Yail.JBRIDGE_DEFINE = [];
 // Blockly.Yail.JBRIDGE_IMPORTS = [];
+var jBridgeTopBlockCodesList = [];
 var jBridgeRegisterEventMap = new Object();
 var jBridgeEventsList = [];
 
@@ -634,6 +635,8 @@ Blockly.Yail.blockToCode1 = function(block) {
 
 
 Blockly.Yail.genJBridgeCode = function(topBlocks){
+  Blockly.Yail.parseTopBlocks(topBlocks);
+
   var code = Blockly.Yail.JBRIDGE_PACKAGE_NAME + 
   Blockly.Yail.JBRIDGE_BASE_IMPORTS +
   
@@ -643,7 +646,6 @@ Blockly.Yail.genJBridgeCode = function(topBlocks){
 };
 
 Blockly.Yail.genJBridgeClass =  function (topBlocks){
-  Blockly.Yail.parseTopBlocks(topBlocks);
   var code = "\npublic class Screen1 extends Form implements HandlesEventDispatching { \n"
     + Blockly.Yail.genJBridgeDefineMethod()
     +Blockly.Yail.genJBridgeDispatchEvent(); 
@@ -651,80 +653,161 @@ Blockly.Yail.genJBridgeClass =  function (topBlocks){
   return code;
 };
 
-Blockly.Yail.genJBridgeEventsRegister = function(jBridgeEventsList){
+Blockly.Yail.genJBridgeEventsRegister = function(jBridgeRegisterEventMap){
   var registeredEvents = []
-  for(var key in jBridgeEventsList){
-      registeredEvents.push(jBridgeEventsList[key]);
+  for(var key in jBridgeRegisterEventMap){
+      registeredEvents.push(jBridgeRegisterEventMap[key]);
   }
   return registeredEvents.join("\n");
 };
 
-Blockly.Yail.genJBridgeDefineMethod =  function (jBridgeEventsList){
+Blockly.Yail.genJBridgeDefineMethod =  function (){
  var code =  "\nprotected void $define() { \n"
   + "// TODO Implement Definetion and Declaration \n"
-  + Blockly.Yail.genJBridgeEventsRegister(jBridgeEventsList)
+  + Blockly.Yail.genJBridgeEventsRegister(jBridgeRegisterEventMap)
   +"\n}";
     return code;
 };
 
 Blockly.Yail.genJBridgeDispatchEvent = function(){
   var code = "\npublic boolean dispatchEvent(Component component, String componentName, String eventName, Object[] params){\n"
-  + jBridgeEventsList.join("\n")
+  + jBridgeTopBlockCodesList.join("\n")
   +"\n return false;"
   +"\n}";
 
   return code;
 };
 
+
 Blockly.Yail.parseTopBlocks = function (topBlocks){
     for (var x = 0, block; block = topBlocks[x]; x++) {
-      var blockCategory = block.category;
-      if (blockCategory == "Component"){
-        Blockly.Yail.parseJBridgeComponentBlock(block);
-      }
+      jBridgeTopBlockCodesList.push(Blockly.Yail.parseBlock(block));
     }
 };
 
-Blockly.Yail.parseJBridgeComponentBlock = function(componentBlock){
-  var componentType = componentBlock.type;
-  if (componentType == "component_event"){
-      Blockly.Yail.paseJBridgeEventBlock(componentBlock)
-  }else if (componentType == "component_set_get"){
-      if (componentBlock.setOrGet == "set"){
+Blockly.Yail.getJBridgeInstanceName = function(block){
+  return block.instanceName;
+};
 
-      }else{
-        
-      }
-      Blockly.Yail.paseJBridgeEventBlock(componentBlock)
-  }else{
-    document.write( "Invalid Block type : " + componentType );
+Blockly.Yail.parseBlock = function (block){
+  var code = "";
+  var blockCategory = block.category;
+  if (blockCategory == "Component"){
+      code = Blockly.Yail.parseJBridgeComponentBlock(block);
+  }else if (blockCategory == "Colors"){
+    code = Blockly.Yail.parseJBridgeColorBlock(block);
+  }else if (blockCategory == "Varialbes"){
+
+  }
+
+  return code;
+}
+Blockly.Yail.parseVariableBlocks = function (variableBlock){
+var code = "";
+  var componentType = variableBlock.type;
+  if (componentType == "lexical_variable_set"){
+      code = Blockly.Yail.parseJBridgeVariableSetBlock(variableBlock);
   }
 };
 
+Blockly.Yail.parseJBridgeVariableSetBlock = function(variableBlock){
+    return Blockly.Yail.genJBridgeVariableSetBlock();
+  };
+
+Blockly.Yail.genJBridgeVariableSetBlock = function(){
+  var code = ""
+  return code;
+};
+
+Blockly.Yail.parseJBridgeComponentBlock = function(componentBlock){
+  var code = "";
+  var componentType = componentBlock.type;
+  if (componentType == "component_event"){
+       code = Blockly.Yail.paseJBridgeEventBlock(componentBlock);
+  }else if (componentType == "component_set_get"){
+      if (componentBlock.setOrGet == "set"){
+          code = Blockly.Yail.parseJBridgeSetBlock(componentBlock);
+      }else{
+          code = Blockly.Yail.parseJBridgeGetBlock(componentBlock);
+      }
+  }else{
+    code =  "Invalid Component type : " + componentType ;
+  }
+
+  return code;
+};
+
+Blockly.Yail.parseJBridgeColorBlock = function(colorBlock){
+  // TOOD Fix the copy pasted or duplicated color palette block 
+  var color = colorBlock.type.toUpperCase();
+  return Blockly.Yail.genJBridgeColorBlock(color);
+};
+
+Blockly.Yail.genJBridgeColorBlock = function(color){
+    return color;
+};
+
+Blockly.Yail.parseJBridgeGetBlock = function(getBlock){
+  
+  return Blockly.Yail.genJBridgeSetBlock();
+};
+
+Blockly.Yail.genJBridgeGetBlock = function(){
+  var code = "// TODO Implement Get Block";
+  return code;
+};
+
+Blockly.Yail.parseJBridgeSetBlock = function(setBlock){
+  var componentName = Blockly.Yail.getJBridgeInstanceName(setBlock);
+  var property = setBlock.propertyName;
+
+  //Assuming that set block always has only one child Block
+  var value = Blockly.Yail.parseBlock(setBlock.childBlocks_[0]);
+  return Blockly.Yail.genJBridgeSetBlock(componentName, property, value);
+};
+
+Blockly.Yail.genJBridgeSetBlock = function(componentName, property, value){
+  var code = componentName
+             +"."
+             +property
+             +" = "
+             +value ;
+  return code;
+};
+
 Blockly.Yail.paseJBridgeEventBlock = function(eventBlock){
+  var code = "";
   var eventName = eventBlock.eventName;
   var componentName = eventBlock.instanceName;
 
   if (eventName == "Click"){
-    Blockly.Yail.buildJBridgeClickEventBlock(eventBlock);
+    code = Blockly.Yail.parseJBridgeClickEventBlock(eventBlock);
   }
   else{
-    jBridgeEventsList.push("Invalid Event type :" + eventName);
+    code = "Invalid Event type :" + eventName;
   }
 
   //Add to RegisterEventsMap
   jBridgeRegisterEventMap[eventName] = Blockly.Yail.genJBridgeEventDispatcher(eventName); 
 
+  return code;
 };
 
 
-Blockly.Yail.buildJBridgeClickEventBlock = function(clickEventBlock){
-
+Blockly.Yail.parseJBridgeClickEventBlock = function(clickEventBlock, isChildBlock){
+  var code = "";
+  isChildBlock = typeof isChildBlock !== 'undefined' ? isChildBlock : false;
   var componentName = clickEventBlock.instanceName;
   var eventName = clickEventBlock.eventName;
-  var body = "//TODO Genrate Event(When) Block Body";
+  var body = "";
+  for (var x = 0, childBlock; childBlock = clickEventBlock.childBlocks_[x]; x++) {
+      body = body 
+             + "\n"
+             + Blockly.Yail.parseBlock(childBlock);
+  }
 
-  jBridgeEventsList.push(Blockly.Yail.genJBridgeEventBlock(componentName, eventName, body));  
+  code = Blockly.Yail.genJBridgeEventBlock(componentName, eventName, body);
+  return code;
 };
 
 //Event Blocks are actualy the "When Blocks"
