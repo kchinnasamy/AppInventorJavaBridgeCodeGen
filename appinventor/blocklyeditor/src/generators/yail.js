@@ -696,8 +696,8 @@ Blockly.Yail.parseBlock = function (block){
       code = Blockly.Yail.parseJBridgeComponentBlock(block);
   }else if (blockCategory == "Colors"){
     code = Blockly.Yail.parseJBridgeColorBlock(block);
-  }else if (blockCategory == "Varialbes"){
-
+  }else if (blockCategory == "Variables"){
+    code = Blockly.Yail.parseVariableBlocks(block);
   }
 
   return code;
@@ -707,10 +707,24 @@ var code = "";
   var componentType = variableBlock.type;
   if (componentType == "lexical_variable_set"){
       code = Blockly.Yail.parseJBridgeVariableSetBlock(variableBlock);
+  }else if(componentType == "lexical_variable_get"){
+      code = Blockly.Yail.parseJBridgeVariableGetBlock(variableBlock);
   }
+  return code;
 };
 
-Blockly.Yail.parseJBridgeVariableSetBlock = function(variableBlock){
+Blockly.Yail.parseJBridgeVariableGetBlock = function(variableGetBlock){
+    var paramName = variableGetBlock.eventparam;
+    return Blockly.Yail.genJBridgeVariableGetBlock(paramName);
+  };
+
+Blockly.Yail.genJBridgeVariableGetBlock = function(paramName){
+  var code = paramName;
+  return code;
+};
+
+
+Blockly.Yail.parseJBridgeVariableSetBlock = function(variableSetBlock){
     return Blockly.Yail.genJBridgeVariableSetBlock();
   };
 
@@ -730,11 +744,67 @@ Blockly.Yail.parseJBridgeComponentBlock = function(componentBlock){
       }else{
           code = Blockly.Yail.parseJBridgeGetBlock(componentBlock);
       }
+  }else if (componentType == "component_method" ){
+    code = Blockly.Yail.parseJBridgeMethodCallBlock(componentBlock);
   }else{
     code =  "Invalid Component type : " + componentType ;
   }
 
   return code;
+};
+
+Blockly.Yail.parseJBridgeMethodCallBlock = function(methodCallBlock){
+  var objectName = methodCallBlock.instanceName;
+  var methodName = methodCallBlock.methodName;
+  var parentParamMap = Blockly.Yail.parseParamsMap(methodCallBlock.parentBlock_);
+  var paramsList = [];
+
+  //parse all the params Block
+  for (var y = 0, paramBlock; paramBlock = methodCallBlock.childBlocks_[y]; y++){
+      paramsList.push(Blockly.Yail.parseBlock(paramBlock));
+  }
+  var jBridgeParamList = [];
+
+  for (var y = 0, param; param = paramsList[y]; y++){
+    var paramIndex = parentParamMap[param];
+    if ( paramIndex == undefined ){
+      jBridgeParamList.push(param);
+    }else{
+      jBridgeParamList.push("params[" + paramIndex+"]");
+    }
+  }
+
+  return Blockly.Yail.genJBridgeMethodCallBlock(objectName ,methodName, jBridgeParamList);
+};
+
+Blockly.Yail.parseParamsMap = function(block){
+  var paramsMap = new Object();
+  for (var x = 0, input; input = block.inputList[x]; x++) {
+    var paramIndex = 0;
+    if(input.name == "PARAMETERS"){
+      for (var y = 0, param; param = input.fieldRow[y]; y++){
+        var paramName = param.getText();
+        if (paramName.replace(/ /g,'').length > 0){
+            paramsMap[paramName] = paramIndex;
+            paramIndex ++;
+        }
+      }  
+    }
+  }
+  return paramsMap;
+};
+
+Blockly.Yail.genJBridgeMethodCallBlock = function(objectName, methodName, paramsList){
+var code = "";
+// use splice to get all the arguments after 'methodName'
+var args = Array.prototype.splice.call(arguments, 2);
+code = objectName
+       + "."
+       +methodName
+       +" ("
+       + paramsList.join(", ")
+       +");"  
+return code;
 };
 
 Blockly.Yail.parseJBridgeColorBlock = function(colorBlock){
@@ -748,12 +818,15 @@ Blockly.Yail.genJBridgeColorBlock = function(color){
 };
 
 Blockly.Yail.parseJBridgeGetBlock = function(getBlock){
-  
-  return Blockly.Yail.genJBridgeSetBlock();
+  var componentName = Blockly.Yail.getJBridgeInstanceName(setBlock);
+  var property = setBlock.propertyName;
+  return Blockly.Yail.genJBridgeSetBlock(componentName, property);
 };
 
-Blockly.Yail.genJBridgeGetBlock = function(){
-  var code = "// TODO Implement Get Block";
+Blockly.Yail.genJBridgeGetBlock = function(componentName, property){
+  var code = componentName
+             +"."
+             +property;
   return code;
 };
 
@@ -761,8 +834,12 @@ Blockly.Yail.parseJBridgeSetBlock = function(setBlock){
   var componentName = Blockly.Yail.getJBridgeInstanceName(setBlock);
   var property = setBlock.propertyName;
 
-  //Assuming that set block always has only one child Block
-  var value = Blockly.Yail.parseBlock(setBlock.childBlocks_[0]);
+  var value = "";
+  for (var x = 0, childBlock; childBlock = setBlock.childBlocks_[x]; x++) {
+    value = value
+            + " "
+            + Blockly.Yail.parseBlock(childBlock);
+  }
   return Blockly.Yail.genJBridgeSetBlock(componentName, property, value);
 };
 
@@ -770,8 +847,9 @@ Blockly.Yail.genJBridgeSetBlock = function(componentName, property, value){
   var code = componentName
              +"."
              +property
-             +" = "
-             +value ;
+             +"("
+             +value 
+             +")";
   return code;
 };
 
@@ -780,13 +858,7 @@ Blockly.Yail.paseJBridgeEventBlock = function(eventBlock){
   var eventName = eventBlock.eventName;
   var componentName = eventBlock.instanceName;
 
-  if (eventName == "Click"){
-    code = Blockly.Yail.parseJBridgeClickEventBlock(eventBlock);
-  }
-  else{
-    code = "Invalid Event type :" + eventName;
-  }
-
+  code = Blockly.Yail.parseJBridgeEventBlock(eventBlock);
   //Add to RegisterEventsMap
   jBridgeRegisterEventMap[eventName] = Blockly.Yail.genJBridgeEventDispatcher(eventName); 
 
@@ -794,13 +866,13 @@ Blockly.Yail.paseJBridgeEventBlock = function(eventBlock){
 };
 
 
-Blockly.Yail.parseJBridgeClickEventBlock = function(clickEventBlock, isChildBlock){
+Blockly.Yail.parseJBridgeEventBlock = function(eventBlock, isChildBlock){
   var code = "";
   isChildBlock = typeof isChildBlock !== 'undefined' ? isChildBlock : false;
-  var componentName = clickEventBlock.instanceName;
-  var eventName = clickEventBlock.eventName;
+  var componentName = eventBlock.instanceName;
+  var eventName = eventBlock.eventName;
   var body = "";
-  for (var x = 0, childBlock; childBlock = clickEventBlock.childBlocks_[x]; x++) {
+  for (var x = 0, childBlock; childBlock = eventBlock.childBlocks_[x]; x++) {
       body = body 
              + "\n"
              + Blockly.Yail.parseBlock(childBlock);
